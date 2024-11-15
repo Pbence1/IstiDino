@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Dino Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f7f7f7;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: url(mchatter.jpg) repeat-x;
+            background-size: cover;
+            background-repeat: no-repeat;
+        }
+        #game {
+            position: relative;
+            width: 800px;
+            height: 310px;
+            border: 5px solid #ccc;
+            overflow: hidden;
+            display: none; /* Hide game initially */
+            z-index: 1; /* Set lower z-index for game */
+        }
+        #dino {
+            position: absolute;
+            bottom: 0;
+            width: 80px;
+            height: 80px;
+            background: url(qr224mu8.png) no-repeat center center / contain;
+        }
+        #obstacle, .bird {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 90px;
+            height: 90px;
+            animation: moveObstacle 2s linear infinite;
+            background-size: 100% 100%;
+        }
+        #obstacle {
+            background: url(istiitoka.png) no-repeat center center / contain;
+            background-size: 200% 200%;
+            width: 5%;
+        }
+        .bird {
+            bottom: 150px; /* Adjust bird height */
+            background: url(matrac.png) no-repeat center center / contain;
+            animation: moveBird 3s linear infinite;
+        }
+        @keyframes moveObstacle {
+            from { right: 0; }
+            to { right: 100%; }
+        }
+        @keyframes moveBird {
+            from { right: 0; }
+            to { right: 100%; }
+        }
+        .jump {
+            animation: jump 0.7s;
+        }
+        @keyframes jump {
+            0% { bottom: 0; }
+            50% { bottom: 140px; }
+            100% { bottom: 0; }
+        }
+        .paused {
+            animation-play-state: paused !important;
+        }
+        #startButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        #score {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        /* Personal Record Styling */
+        #personalRecord {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* Rules Modal Styling */
+        #rulesModal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            padding: 20px;
+            background-color: #fff;
+            border: 2px solid #ccc;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            z-index: 2; /* Set higher z-index for modal */
+        }
+        #rulesModal h2 {
+            margin-bottom: 20px;
+        }
+        #rulesModal p {
+            margin-bottom: 15px;
+        }
+        #closeRulesButton {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #closeRulesButton:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <div id="personalRecord">Personal Record: 0</div> <!-- Personal Record Display -->
+
+    <button id="startButton">Start Game</button>
+    <button id="rulesButton">Game Rules</button>
+
+    <div id="rulesModal">
+        <h2>Szabályok</h2>
+        <p><strong>1.</strong> Nyomjad a <b>Spacebar-t</b> hogy ugorjon az Istid.</p>
+        <p><strong>2.</strong> Ne menj bele a 2 lityis kőbányaikba.</p>
+        <p><strong>3.</strong> Ha belemész a 2 lityis kőbányaikba, akkor az Istidnek gatya van</p>
+        <p><strong>4.</strong> Akkor nő a pontod, ha átmész a kőbambikon vagy beleugrasz egy Matrac Isitbe.</p>
+        <button id="closeRulesButton">Bezár</button>
+    </div>
+
+    <div id="game">
+        <div id="dino"></div>
+        <div id="obstacle"></div>
+    </div>
+
+    <script>
+        let score = 0;
+        let gameInterval;
+        let birdSpawnInterval;
+        let gameStarted = false;
+        let personalRecord = 0; // Track personal record
+
+        // Start button click handler
+        document.getElementById('startButton').addEventListener('click', function() {
+            document.getElementById('startButton').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+            document.getElementById('personalRecord').style.display = 'none'; // Hide personal record during game
+            startGame();
+        });
+
+        // Show game rules when rules button is clicked
+        document.getElementById('rulesButton').addEventListener('click', function() {
+            document.getElementById('rulesModal').style.display = 'block';
+        });
+
+        // Close the rules modal
+        document.getElementById('closeRulesButton').addEventListener('click', function() {
+            document.getElementById('rulesModal').style.display = 'none';
+        });
+
+        function startGame() {
+            if (gameStarted) {
+                resetGame();
+            }
+            gameStarted = true;
+            document.getElementById('obstacle').classList.remove('paused');
+
+            // Reset the score to 0 when starting the game
+            score = 0;
+            document.getElementById('score').innerText = 'Score: ' + score;
+
+            document.addEventListener('keydown', function(event) {
+                if (event.code === 'Space') {
+                    jump();
+                }
+            });
+
+            function jump() {
+                let dino = document.getElementById('dino');
+                if (!dino.classList.contains('jump')) {
+                    dino.classList.add('jump');
+                    setTimeout(function() {
+                        dino.classList.remove('jump');
+                    }, 500);
+                }
+            }
+
+            gameInterval = setInterval(checkCollision, 10);
+            birdSpawnInterval = setInterval(spawnBird, getRandomInt(3000, 6000)); // Birds spawn between 3 to 6 seconds
+        }
+
+        function checkCollision() {
+            let dino = document.getElementById('dino');
+            let obstacle = document.getElementById('obstacle');
+            let birds = document.getElementsByClassName('bird');
+
+            let dinoBottom = parseInt(window.getComputedStyle(dino).getPropertyValue('bottom'));
+            let obstacleLeft = parseInt(window.getComputedStyle(obstacle).getPropertyValue('left'));
+
+            // Check collision with obstacle
+            if (obstacleLeft < 80 && obstacleLeft > 0 && dinoBottom <= 80) {
+                gameOver(); // If obstacle hits the dino, game over
+            }
+
+            // Check collision with birds
+            Array.from(birds).forEach(bird => {
+                let birdLeft = parseInt(window.getComputedStyle(bird).getPropertyValue('left'));
+                let birdBottom = parseInt(window.getComputedStyle(bird).getPropertyValue('bottom'));
+                let birdHeight = bird.offsetHeight;
+
+                // Check if dino collides with the bird (any part of the dino body)
+                if (birdLeft < 80 && birdLeft > 0 && dinoBottom <= birdBottom + birdHeight) {
+                    // Bird hit
+                    bird.remove(); // Remove bird
+                    updateScore(100); // Add 100 points
+                }
+            });
+
+            // Update score when obstacles are passed
+            if (obstacleLeft < -10) {
+                updateScore();
+            }
+
+            Array.from(birds).forEach(bird => {
+                let birdLeft = parseInt(window.getComputedStyle(bird).getPropertyValue('left'));
+                if (birdLeft < -10) {
+                    updateScore();
+                    bird.remove(); // Remove bird after it passes
+                }
+            });
+        }
+
+        function gameOver() {
+            alert('Game Over');
+            clearInterval(gameInterval);
+            clearInterval(birdSpawnInterval);
+            document.getElementById('obstacle').classList.add('paused');
+            gameStarted = false;
+
+            // Hide game canvas and show start button
+            document.getElementById('game').style.display = 'none';
+            document.getElementById('startButton').style.display = 'block';
+            document.getElementById('personalRecord').style.display = 'block'; // Show personal record when game ends
+
+            // Update personal record if needed
+            if (score > personalRecord) {
+                personalRecord = score;
+                document.getElementById('personalRecord').innerText = 'Personal Record: ' + personalRecord;
+            }
+
+            // Reset the score when the game ends
+            score = 0;
+            document.getElementById('score').innerText = 'Score: ' + score;
+        }
+
+        function updateScore(points = 10) {
+            score += points;
+            document.getElementById('score').innerText = 'Score: ' + score;
+        }
+
+        function spawnBird() {
+            let game = document.getElementById('game');
+            let bird = document.createElement('div');
+            bird.classList.add('bird');
+            game.appendChild(bird);
+
+            // Remove bird after animation ends
+            setTimeout(() => {
+                if (bird.parentNode) {
+                    bird.parentNode.removeChild(bird);
+                }
+            }, 3000);
+        }
+
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function resetGame() {
+            // Reset the score and remove the birds and obstacles after death
+            score = 0;
+            document.getElementById('score').innerText = 'Score: ' + score;
+            document.getElementById('dino').style.bottom = '0px';
+
+            // Remove all bird elements
+            let birds = document.getElementsByClassName('bird');
+            while (birds[0]) {
+                birds[0].parentNode.removeChild(birds[0]);
+            }
+
+            // Reset obstacle position
+            let obstacle = document.getElementById('obstacle');
+            obstacle.style.right = '0px';
+        }
+    </script>
+</body>
+</html>
